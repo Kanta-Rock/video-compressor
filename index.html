@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebBrowser Video Compressor</title>
-  <!-- GitHub PagesでのSharedArrayBuffer・クロスオリジン制限回避用 -->
-  <script src="https://unpkg.com/coi-serviceworker/coi-serviceworker.min.js"></script>
-  <!-- FFmpeg.wasm ライブラリの読み込み -->
+  <!-- FFmpeg.wasm 安定版ライブラリ -->
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; line-height: 1.6; }
@@ -35,9 +33,9 @@
   <script>
     const { createFFmpeg, fetchFile } = FFmpeg;
 
-    // シングルスレッド版を使用（GitHub Pagesでの実行安定性とメモリ消費を優先）
+    // 互換性の高いコアバージョンを指定
     const ffmpeg = createFFmpeg({
-      corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
+      corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
       log: true
     });
 
@@ -59,7 +57,7 @@
       }
     })();
 
-    // 圧縮実行処理
+    // 圧縮処理
     compressBtn.addEventListener('click', async () => {
       const file = uploader.files[0];
       if (!file) return alert('動画を選択してください。');
@@ -69,10 +67,8 @@
       resultDiv.style.display = 'none';
 
       try {
-        // メモリ仮想ファイルシステムへの書き込み
         ffmpeg.FS('writeFile', 'input_file', await fetchFile(file));
 
-        // FFmpegコマンドの実行 (-crf 28 で高圧縮率設定)
         await ffmpeg.run(
           '-i', 'input_file',
           '-vcodec', 'libx264',
@@ -81,7 +77,6 @@
           'output.mp4'
         );
 
-        // 変換結果の読み出しと表示
         const data = ffmpeg.FS('readFile', 'output.mp4');
         const blob = new Blob([data.buffer], { type: 'video/mp4' });
         const url = URL.createObjectURL(blob);
@@ -96,7 +91,6 @@
         status.innerText = 'エラーが発生しました: ' + err.message;
       } finally {
         compressBtn.disabled = false;
-        // メモリ解放
         try {
           ffmpeg.FS('unlink', 'input_file');
           ffmpeg.FS('unlink', 'output.mp4');
