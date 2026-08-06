@@ -4,10 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebBrowser Video Compressor</title>
-  <!-- COOP/COEP 制限補正スクリプト -->
-  <script src="https://unpkg.com/coi-serviceworker/coi-serviceworker.min.js"></script>
-  <!-- FFmpeg.wasm ライブラリ -->
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+  <!-- GitHub Pagesで確実に動作する安定版 FFmpeg.wasm (v0.10.1) -->
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
   <style>
     body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; line-height: 1.6; }
     .box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
@@ -35,9 +33,8 @@
   <script>
     const { createFFmpeg, fetchFile } = FFmpeg;
 
-    // SharedArrayBufferを要求しないシングルスレッド版(core-st)を指定
+    // ヘッダー制約を受けない設定で初期化
     const ffmpeg = createFFmpeg({
-      corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
       log: true
     });
 
