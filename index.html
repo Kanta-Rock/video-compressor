@@ -1,101 +1,89 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebBrowser Video Compressor</title>
-  <!-- GitHub Pagesで確実に動作する安定版 FFmpeg.wasm (v0.10.1) -->
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
-  <style>
-    body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; line-height: 1.6; }
-    .box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
-    button { padding: 10px 20px; margin-top: 10px; cursor: pointer; }
-    button:disabled { cursor: not-allowed; opacity: 0.6; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebBrowser Video Compressor</title>
+    <!-- FFmpeg.wasm ライブラリ (v0.11.6) -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+        .box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
+        button { padding: 10px 20px; margin-top: 10px; cursor: pointer; }
+        button:disabled { cursor: not-allowed; opacity: 0.6; }
+    </style>
 </head>
 <body>
-
-  <h2>ブラウザ上動画圧縮ツール (FFmpeg.wasm)</h2>
-  <div class="box">
-    <input type="file" id="uploader" accept="video/*"><br><br>
-    <button id="compressBtn" disabled>圧縮開始</button>
-    <p id="status">FFmpegを初期化中...</p>
-    
-    <div id="result" style="display:none; margin-top: 20px;">
-      <h3>完成ファイル:</h3>
-      <video id="outputVideo" controls style="max-width: 100%;"></video><br><br>
-      <a id="downloadLink" download="compressed.mp4">
-        <button>ファイルをダウンロード</button>
-      </a>
+    <h2>ブラウザ上動画圧縮ツール (FFmpeg.wasm)</h2>
+    <div class="box">
+        <input type="file" id="uploader" accept="video/*"><br><br>
+        <button id="compressBtn" disabled>圧縮開始</button>
+        <p id="status">FFmpegを初期化中...</p>
+        <div id="result" style="display:none; margin-top: 20px;">
+            <h3>完成ファイル:</h3>
+            <video id="outputVideo" controls style="max-width: 100%;"></video><br><br>
+            <a id="downloadLink" download="compressed.mp4">
+                <button>ファイルをダウンロード</button>
+            </a>
+        </div>
     </div>
-  </div>
 
-  <script>
-    const { createFFmpeg, fetchFile } = FFmpeg;
+    <script>
+        const { createFFmpeg, fetchFile } = FFmpeg;
 
-    // ヘッダー制約を受けない設定で初期化
-    const ffmpeg = createFFmpeg({
-      log: true
-    });
+        // SharedArrayBufferを使用しないシングルスレッド版コアを指定
+        const ffmpeg = createFFmpeg({
+            corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
+            log: true
+        });
 
-    const status = document.getElementById('status');
-    const uploader = document.getElementById('uploader');
-    const compressBtn = document.getElementById('compressBtn');
-    const resultDiv = document.getElementById('result');
-    const outputVideo = document.getElementById('outputVideo');
-    const downloadLink = document.getElementById('downloadLink');
+        const status = document.getElementById('status');
+        const uploader = document.getElementById('uploader');
+        const compressBtn = document.getElementById('compressBtn');
+        const resultDiv = document.getElementById('result');
+        const outputVideo = document.getElementById('outputVideo');
+        const downloadLink = document.getElementById('downloadLink');
 
-    // 初期化処理
-    (async () => {
-      try {
-        await ffmpeg.load();
-        status.innerText = '準備完了。動画ファイルを選択してください。';
-        compressBtn.disabled = false;
-      } catch (err) {
-        status.innerText = '初期化エラー: ' + err.message;
-      }
-    })();
+        // 初期化処理
+        (async () => {
+            try {
+                await ffmpeg.load();
+                status.innerText = '準備完了。動画ファイルを選択してください。';
+                compressBtn.disabled = false;
+            } catch (err) {
+                status.innerText = '初期化エラー: ' + err.message;
+            }
+        })();
 
-    // 圧縮処理
-    compressBtn.addEventListener('click', async () => {
-      const file = uploader.files[0];
-      if (!file) return alert('動画を選択してください。');
+        // 圧縮処理
+        compressBtn.addEventListener('click', async () => {
+            const file = uploader.files[0];
+            if (!file) return alert('動画を選択してください。');
+            status.innerText = '処理中...（ブラウザを閉じないでください）';
+            compressBtn.disabled = true;
+            resultDiv.style.display = 'none';
 
-      status.innerText = '処理中...（ブラウザを閉じないでください）';
-      compressBtn.disabled = true;
-      resultDiv.style.display = 'none';
-
-      try {
-        ffmpeg.FS('writeFile', 'input_file', await fetchFile(file));
-
-        await ffmpeg.run(
-          '-i', 'input_file',
-          '-vcodec', 'libx264',
-          '-crf', '28',
-          '-preset', 'ultrafast',
-          'output.mp4'
-        );
-
-        const data = ffmpeg.FS('readFile', 'output.mp4');
-        const blob = new Blob([data.buffer], { type: 'video/mp4' });
-        const url = URL.createObjectURL(blob);
-
-        outputVideo.src = url;
-        downloadLink.href = url;
-        downloadLink.download = `compressed_${file.name.split('.')[0]}.mp4`;
-        
-        resultDiv.style.display = 'block';
-        status.innerText = '圧縮完了！';
-      } catch (err) {
-        status.innerText = 'エラーが発生しました: ' + err.message;
-      } finally {
-        compressBtn.disabled = false;
-        try {
-          ffmpeg.FS('unlink', 'input_file');
-          ffmpeg.FS('unlink', 'output.mp4');
-        } catch (e) {}
-      }
-    });
-  </script>
+            try {
+                ffmpeg.FS('writeFile', 'input_file', await fetchFile(file));
+                await ffmpeg.run('-i', 'input_file', '-vcodec', 'libx264', '-crf', '28', '-preset', 'ultrafast', 'output.mp4');
+                const data = ffmpeg.FS('readFile', 'output.mp4');
+                const blob = new Blob([data.buffer], { type: 'video/mp4' });
+                const url = URL.createObjectURL(blob);
+                outputVideo.src = url;
+                downloadLink.href = url;
+                downloadLink.download = `compressed_${file.name.split('.')[0]}.mp4`;
+                resultDiv.style.display = 'block';
+                status.innerText = '圧縮完了！';
+            } catch (err) {
+                status.innerText = 'エラーが発生しました: ' + err.message;
+            } finally {
+                compressBtn.disabled = false;
+                try {
+                    ffmpeg.FS('unlink', 'input_file');
+                    ffmpeg.FS('unlink', 'output.mp4');
+                } catch (e) {}
+            }
+        });
+    </script>
 </body>
 </html>
